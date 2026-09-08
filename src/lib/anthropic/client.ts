@@ -13,7 +13,9 @@ export function getAnthropicClient(): Anthropic {
   return _client;
 }
 
-export const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
+// `||` (not `??`) so an env var that's set-but-empty (e.g. added blank in a
+// dashboard) still falls back correctly, not just an unset one.
+export const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
 /**
  * Calls Claude with a system prompt + user content and parses a single JSON
