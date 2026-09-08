@@ -78,14 +78,24 @@ RLS (same pattern as AiSend). `audit_runs` → `audit_pages` (one row per compar
 `audit_comparisons` (one row per run: gaps, hypothesis, recommendations, scores).
 `audit_usage` tracks per-run Anthropic/DataForSEO usage for cost visibility (Part C).
 
+### Auth
+
+Supabase Auth (email/password) — `src/app/login`. `supabase/migrations/0002_auth_provisioning.sql`
+adds an `auth.users` trigger that auto-creates a `clients` row + `client_members` (owner)
+row for every signup, so a brand-new account can submit an audit immediately with no
+manual SQL. `POST /api/audits` resolves `client_id` server-side from the caller's own
+membership — it never trusts a client_id from the request body. `src/middleware.ts`
+redirects unauthenticated visitors to `/login` for every non-API route.
+
 ## Setup
 
 1. **Supabase**
    - Create a project, enable the `vector` extension (the migration does this too).
-   - Run `supabase/migrations/0001_init.sql` against it (Supabase SQL editor, or the
-     Supabase CLI: `supabase db push` once linked).
-   - Insert at least one row into `clients`, and a `client_members` row linking your
-     `auth.users` id to it — the dashboard form needs a `client_id` to submit audits.
+   - Run `supabase/migrations/0001_init.sql` then `0002_auth_provisioning.sql` against it,
+     in that order (Supabase SQL editor, or the Supabase CLI: `supabase db push`).
+   - In Authentication → Providers → Email, "Confirm email" is on by default — either
+     leave it on (users confirm via the email Supabase sends before their first sign-in)
+     or turn it off for faster local testing.
 2. **Environment variables** — copy `.env.example` to `.env.local` and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
    - `ANTHROPIC_API_KEY` (required — most modules call Claude)
@@ -106,9 +116,12 @@ RLS (same pattern as AiSend). `audit_runs` → `audit_pages` (one row per compar
 
 ## API
 
+Requires an authenticated Supabase session (cookie-based — the dashboard calls these
+directly from the browser after sign-in).
+
 ```
 POST /api/audits
-{ "client_id": "<uuid>", "target_keyword": "...", "pages": [{ "url": "..." }, { "url": "..." }] }
+{ "target_keyword": "...", "pages": [{ "url": "..." }, { "url": "..." }] }
 -> 202 { "status": "pending", "audit_run_id": "<uuid>" }
 
 GET /api/audits/{audit_run_id}
@@ -134,8 +147,9 @@ Known gaps / v1.1+ (see spec Part D1 phases 3, 5, 8 and Part F):
 - Scoring weights (`src/lib/config/scoring-weights.ts`) and module-scorer heuristics
   (`src/modules/scoring/module-scorers.ts`) are v1 heuristics — tune against real client
   data before relying on absolute score values.
-- No auth UI yet (the dashboard form takes a raw `client_id`); wire up Supabase Auth +
-  a client picker before handing this to non-technical users.
+- Auth is single-workspace-per-user only (one `client_members` row per signup, picked
+  automatically). Agencies managing multiple clients need a workspace switcher — not
+  built yet.
 - Semantic proximity (`src/modules/semantic`) has working embed/cosine-similarity
   helpers and a pgvector column (`audit_pages.embedding`) ready for them, but the
   pipeline doesn't call them yet — entity/relationship-depth scoring is used instead.
