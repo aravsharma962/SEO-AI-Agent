@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { AuditReportResponse } from "@/types/audit";
+import { getOptimizationLevel } from "@/lib/optimization-level";
 
 /**
  * Writes an .xlsx workbook straight from a completed report. Uses the
@@ -18,6 +19,7 @@ export function exportReportToExcel(report: AuditReportResponse) {
     URL: url,
     Rank: s.observed_rank ?? "",
     Current: s.current,
+    Level: getOptimizationLevel(s.current).label,
     Projected: s.projected ?? "",
     "Coverage %": s.coverage,
   }));
