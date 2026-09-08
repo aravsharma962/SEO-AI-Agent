@@ -51,7 +51,7 @@ ${truncated}
   const result = await callClaudeForJson<EntityExtractionResult>({
     system: SYSTEM_PROMPT,
     user,
-    maxTokens: 4096,
+    maxTokens: 8192,
   });
 
   return {

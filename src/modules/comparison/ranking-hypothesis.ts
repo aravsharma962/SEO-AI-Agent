@@ -88,6 +88,6 @@ ${JSON.stringify(params.contentGaps, null, 2)}`;
   return callClaudeForJson<RankingHypothesisResult>({
     system: SYSTEM_PROMPT,
     user,
-    maxTokens: 4096,
+    maxTokens: 8192,
   });
 }

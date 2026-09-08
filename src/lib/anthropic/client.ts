@@ -31,9 +31,11 @@ export async function callClaudeForJson<T>(params: {
 }): Promise<T> {
   const client = getAnthropicClient();
 
+  const maxTokens = params.maxTokens ?? 2048;
+
   const response = await client.messages.create({
     model: DEFAULT_MODEL,
-    max_tokens: params.maxTokens ?? 2048,
+    max_tokens: maxTokens,
     system: params.system,
     messages: [{ role: "user", content: params.user }],
   });
@@ -48,5 +50,17 @@ export async function callClaudeForJson<T>(params: {
     throw new Error(`Could not find JSON in Claude response: ${textBlock.text.slice(0, 200)}`);
   }
 
-  return JSON.parse(jsonMatch[0]) as T;
+  try {
+    return JSON.parse(jsonMatch[0]) as T;
+  } catch (parseError) {
+    // A truncated response (hit max_tokens before finishing the JSON) looks
+    // like a generic "Expected ',' or ']'" syntax error otherwise — this
+    // makes that specific, common cause immediately diagnosable.
+    if (response.stop_reason === "max_tokens") {
+      throw new Error(
+        `Claude's response was cut off after hitting the ${maxTokens}-token limit before finishing valid JSON. Increase maxTokens for this call.`
+      );
+    }
+    throw parseError;
+  }
 }
