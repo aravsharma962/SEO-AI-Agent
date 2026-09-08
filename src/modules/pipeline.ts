@@ -27,9 +27,10 @@ import * as cheerio from "cheerio";
  * not on the Next.js request/response cycle.
  */
 export async function runAuditPipeline(auditRunId: string, input: AuditInput): Promise<void> {
-  const supabase = createSupabaseServiceClient();
+  let supabase: ReturnType<typeof createSupabaseServiceClient> | undefined;
 
   try {
+    supabase = createSupabaseServiceClient();
     await supabase.from("audit_runs").update({ status: "running" }).eq("id", auditRunId);
 
     const intent = await classifySearchIntent({
@@ -140,13 +141,23 @@ export async function runAuditPipeline(auditRunId: string, input: AuditInput): P
       .update({ status: "complete", completed_at: new Date().toISOString() })
       .eq("id", auditRunId);
   } catch (error) {
-    await supabase
-      .from("audit_runs")
-      .update({
-        status: "failed",
-        error: error instanceof Error ? error.message : "Unknown pipeline error",
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", auditRunId);
+    // Logged so a crash that happens before any DB write (e.g. a missing/
+    // invalid SUPABASE_SERVICE_ROLE_KEY) is still visible in Vercel's
+    // function logs, not just silently stuck at "pending" forever.
+    console.error(`Audit pipeline failed for run ${auditRunId}:`, error);
+
+    try {
+      const failClient = supabase ?? createSupabaseServiceClient();
+      await failClient
+        .from("audit_runs")
+        .update({
+          status: "failed",
+          error: error instanceof Error ? error.message : "Unknown pipeline error",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", auditRunId);
+    } catch (writeError) {
+      console.error(`Could not record failure for run ${auditRunId}:`, writeError);
+    }
   }
 }
