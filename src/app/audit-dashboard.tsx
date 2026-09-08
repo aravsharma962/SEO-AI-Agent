@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { AuditReportResponse } from "@/types/audit";
+import ReportView from "./report-view";
 
 type PollResult = AuditReportResponse | { status: string; keyword?: string; error?: string };
 
@@ -70,11 +71,13 @@ export default function AuditDashboard({
     router.refresh();
   }
 
+  const isSuccess = result?.status === "success";
+
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className={`mx-auto px-6 py-12 ${isSuccess ? "max-w-4xl" : "max-w-3xl"}`}>
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">SEO AI Agent</h1>
+          <h1 className="font-display text-2xl font-semibold">SEO AI Agent</h1>
           <p className="mt-1 text-sm text-slate-600">
             {clientName} — signed in as {userEmail}
           </p>
@@ -126,11 +129,19 @@ export default function AuditDashboard({
       {submitError && <p className="mt-4 text-sm text-red-600">{submitError}</p>}
 
       {auditRunId && (
-        <div className="mt-8">
-          <p className="text-sm text-slate-600">Audit run: {auditRunId}</p>
-          <pre className="mt-2 max-h-[600px] overflow-auto rounded bg-slate-900 p-4 text-xs text-slate-100">
-            {result ? JSON.stringify(result, null, 2) : "Waiting for status..."}
-          </pre>
+        <div className="mt-10">
+          {!result || result.status === "pending" || result.status === "running" ? (
+            <p className="text-sm text-slate-500">
+              {result?.status === "running" ? "Running audit…" : "Waiting for status…"} This usually takes 30–90
+              seconds.
+            </p>
+          ) : result.status === "failed" ? (
+            <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Audit failed: {"error" in result ? result.error : "Unknown error"}
+            </p>
+          ) : (
+            <ReportView report={result as AuditReportResponse} auditRunId={auditRunId} />
+          )}
         </div>
       )}
     </main>

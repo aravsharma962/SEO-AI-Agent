@@ -19,10 +19,12 @@ export function assembleReport(params: {
 }): AuditReportResponse {
   const scoresByUrl: AuditReportResponse["scores"] = {};
   params.scores.forEach((s) => {
+    const page = params.pages.find((p) => p.url === s.url);
     scoresByUrl![s.url] = {
       current: s.current_score,
       projected: params.comparison.projected_scores[s.url],
       coverage: s.coverage,
+      observed_rank: page?.observed_rank ?? null,
     };
   });
 
