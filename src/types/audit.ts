@@ -342,15 +342,26 @@ export interface AuditReportResponse {
   keyword: string;
   audit?: {
     search_intent: { primary: SearchIntent; secondary: SearchIntent[] } | null;
-    page_comparison: unknown;
-    entity_semantic_analysis: unknown;
-    eeat_analysis: unknown;
-    local_analysis: unknown;
-    schema_analysis: unknown;
-    technical_analysis: unknown;
-    authority_analysis: unknown;
+    page_comparison: {
+      page_advantages: Record<string, string[]>;
+      content_gaps: ContentGap[];
+    };
+    entity_semantic_analysis: {
+      url: string;
+      entities: Entity[];
+      entity_relationships: EntityRelationship[];
+      semantic_gaps: ContentGap[];
+    }[];
+    eeat_analysis: { url: string; eeat: EeatData; experience: ExperienceData }[];
+    local_analysis: { url: string; local: LocalSeoData }[];
+    schema_analysis: { url: string; schema: SchemaData }[];
+    technical_analysis: { url: string; technical: TechnicalData }[];
+    authority_analysis: { url: string; authority: AuthorityData }[];
   };
-  scores?: Record<string, { current: number; projected?: number; coverage: number }>;
+  scores?: Record<
+    string,
+    { current: number; projected?: number; coverage: number; observed_rank?: number | null }
+  >;
   ranking_hypothesis?: RankingHypothesisItem[];
   recommendations?: Recommendation[];
   missing_data?: string[];

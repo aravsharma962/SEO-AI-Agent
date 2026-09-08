@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { AuditReportResponse } from "@/types/audit";
-
-type PollResult = AuditReportResponse | { status: string; keyword?: string; error?: string };
+import AuditView from "./audit-view";
 
 export default function AuditDashboard({
   clientName,
@@ -18,21 +17,13 @@ export default function AuditDashboard({
   const [urlA, setUrlA] = useState("");
   const [urlB, setUrlB] = useState("");
   const [auditRunId, setAuditRunId] = useState<string | null>(null);
-  const [result, setResult] = useState<PollResult | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
-    setResult(null);
+    setAuditRunId(null);
 
     const response = await fetch("/api/audits", {
       method: "POST",
@@ -51,16 +42,6 @@ export default function AuditDashboard({
     }
 
     setAuditRunId(data.audit_run_id);
-
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      const poll = await fetch(`/api/audits/${data.audit_run_id}`);
-      const pollData: PollResult = await poll.json();
-      setResult(pollData);
-      if (pollData.status === "success" || pollData.status === "failed") {
-        if (pollRef.current) clearInterval(pollRef.current);
-      }
-    }, 4000);
   }
 
   async function handleSignOut() {
@@ -71,17 +52,22 @@ export default function AuditDashboard({
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className={`mx-auto px-6 py-12 ${auditRunId ? "max-w-4xl" : "max-w-3xl"}`}>
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">SEO AI Agent</h1>
+          <h1 className="font-display text-2xl font-semibold">SEO AI Agent</h1>
           <p className="mt-1 text-sm text-slate-600">
             {clientName} — signed in as {userEmail}
           </p>
         </div>
-        <button onClick={handleSignOut} className="text-sm text-slate-600 underline">
-          Sign out
-        </button>
+        <div className="flex items-center gap-4">
+          <Link href="/history" className="text-sm text-slate-600 underline">
+            Audit history
+          </Link>
+          <button onClick={handleSignOut} className="text-sm text-slate-600 underline">
+            Sign out
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4 rounded-lg border border-slate-200 bg-white p-6">
@@ -126,11 +112,8 @@ export default function AuditDashboard({
       {submitError && <p className="mt-4 text-sm text-red-600">{submitError}</p>}
 
       {auditRunId && (
-        <div className="mt-8">
-          <p className="text-sm text-slate-600">Audit run: {auditRunId}</p>
-          <pre className="mt-2 max-h-[600px] overflow-auto rounded bg-slate-900 p-4 text-xs text-slate-100">
-            {result ? JSON.stringify(result, null, 2) : "Waiting for status..."}
-          </pre>
+        <div className="mt-10">
+          <AuditView auditRunId={auditRunId} />
         </div>
       )}
     </main>
