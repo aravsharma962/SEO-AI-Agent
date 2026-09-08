@@ -21,7 +21,7 @@ export async function analyzeSentiment(pageText: string): Promise<SentimentData>
   const result = await callClaudeForJson<Omit<SentimentData, "note">>({
     system: SYSTEM_PROMPT,
     user: truncated,
-    maxTokens: 512,
+    maxTokens: 768,
   });
 
   return {

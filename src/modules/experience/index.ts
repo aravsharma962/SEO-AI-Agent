@@ -21,6 +21,6 @@ export async function analyzeExperience(pageText: string): Promise<ExperienceDat
   return callClaudeForJson<ExperienceData>({
     system: SYSTEM_PROMPT,
     user: truncated,
-    maxTokens: 768,
+    maxTokens: 1024,
   });
 }
