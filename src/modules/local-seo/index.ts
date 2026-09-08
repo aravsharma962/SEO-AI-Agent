@@ -34,6 +34,6 @@ ${truncated}
   return callClaudeForJson<LocalSeoData>({
     system: SYSTEM_PROMPT,
     user,
-    maxTokens: 768,
+    maxTokens: 1024,
   });
 }

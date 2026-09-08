@@ -29,6 +29,6 @@ export async function analyzeEeat(pageText: string): Promise<EeatData> {
   return callClaudeForJson<EeatData>({
     system: SYSTEM_PROMPT,
     user: truncated,
-    maxTokens: 1024,
+    maxTokens: 2048,
   });
 }
