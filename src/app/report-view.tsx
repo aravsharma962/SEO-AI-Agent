@@ -8,6 +8,7 @@ import type {
   RankingHypothesisItem,
 } from "@/types/audit";
 import { exportReportToExcel } from "@/lib/export-xlsx";
+import { getOptimizationLevel } from "@/lib/optimization-level";
 
 function domainOf(url: string): string {
   try {
@@ -183,6 +184,31 @@ export default function ReportView({
                   <Meter label="CURRENT" value={s.current} fillClass={style.fill} />
                   {typeof s.projected === "number" && <Meter label="PROJECTED" value={s.projected} fillClass={style.fillSoft} />}
                 </div>
+
+                {(() => {
+                  const currentLevel = getOptimizationLevel(s.current);
+                  const projectedLevel =
+                    typeof s.projected === "number" ? getOptimizationLevel(s.projected) : null;
+                  const levelUp = projectedLevel && projectedLevel.label !== currentLevel.label;
+                  return (
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${currentLevel.badgeClass}`}>
+                        {currentLevel.label}
+                      </span>
+                      <span className="text-xs text-slate-400">— {currentLevel.description}</span>
+                      {levelUp && (
+                        <>
+                          <span className="text-xs text-slate-300">→</span>
+                          <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${projectedLevel!.badgeClass}`}>
+                            {projectedLevel!.label}
+                          </span>
+                          <span className="text-xs text-slate-400">if implemented</span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <p className="mt-3 text-xs text-slate-500">
                   {typeof s.projected === "number" && (
                     <>
