@@ -7,6 +7,7 @@ import type {
   Recommendation,
   RankingHypothesisItem,
 } from "@/types/audit";
+import { exportReportToExcel } from "@/lib/export-xlsx";
 
 function domainOf(url: string): string {
   try {
@@ -120,9 +121,17 @@ export default function ReportView({
     <div className="space-y-12 font-body">
       {/* Masthead */}
       <div>
-        <p className="font-mono text-xs font-medium uppercase tracking-widest text-slate-400">
-          Comparative Ranking Diagnostic
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <p className="font-mono text-xs font-medium uppercase tracking-widest text-slate-400">
+            Comparative Ranking Diagnostic
+          </p>
+          <button
+            onClick={() => exportReportToExcel(report)}
+            className="flex-none rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Export to Excel
+          </button>
+        </div>
         <h1 className="mt-2 font-display text-3xl font-semibold text-slate-900" style={{ textWrap: "balance" }}>
           {report.keyword}
         </h1>

@@ -102,3 +102,32 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 
   return NextResponse.json(report);
 }
+
+/**
+ * DELETE /api/audits/[id] — removes an audit run. RLS (see
+ * supabase/migrations/0003_audit_runs_delete_policy.sql) confines this to
+ * audit runs owned by the caller's client; audit_pages/audit_comparisons/
+ * audit_usage cascade-delete automatically via their FK constraints.
+ */
+export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+  const supabase = createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("audit_runs")
+    .delete()
+    .eq("id", params.id)
+    .select("id");
+
+  if (error) {
+    return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
+  }
+
+  if (!data || data.length === 0) {
+    return NextResponse.json(
+      { status: "error", message: "Audit run not found or not permitted" },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({ status: "deleted" });
+}
