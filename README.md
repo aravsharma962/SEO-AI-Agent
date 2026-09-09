@@ -51,7 +51,7 @@ deterministic TypeScript.
 | Page crawl / extraction | Code | `src/modules/extraction` |
 | Content architecture mapping | Code | `src/modules/content-architecture` |
 | Entity extraction + relationships | Claude | `src/modules/entities` |
-| Semantic proximity | Code (pgvector-ready, Voyage embeddings) | `src/modules/semantic` |
+| Semantic proximity | Code (pgvector + Voyage embeddings) | `src/modules/semantic` |
 | Sentiment | Claude (diagnostic only) | `src/modules/sentiment` |
 | E-E-A-T | Claude (checklist-guided) | `src/modules/eeat` |
 | Experience | Claude (checklist-guided) | `src/modules/experience` |
@@ -74,6 +74,16 @@ caller-supplied hint only if the search comes back inconclusive) — never a gue
 submission order. Adds ~2 extra Claude calls per audit (one per page); see the note in
 `src/modules/serp-check/index.ts` on why this never throws.
 
+### Historical rank tracking
+
+Every completed audit seeds `rank_history` with the live-verified rank for each page
+(`src/modules/pipeline.ts`). A Vercel Cron job (`vercel.json` → `/api/cron/rank-check`,
+daily) re-checks any tracked (client, keyword, url) whose last check is more than 6 days
+old, up to 20 per run to bound cost — this is the "automated SERP tracking" /
+"ranking-change attribution" groundwork from spec Part F. Set `CRON_SECRET` in Vercel's
+env vars so the cron endpoint only accepts Vercel's own signed requests. History shows up
+on the report itself once a page has 2+ data points (`src/app/rank-history.tsx`).
+
 ### Guardrails (spec A4/A10/A11)
 
 Enforced primarily via the system prompts in `src/modules/comparison/ranking-hypothesis.ts`,
@@ -94,9 +104,18 @@ RLS (same pattern as AiSend). `audit_runs` → `audit_pages` (one row per compar
 Supabase Auth (email/password) — `src/app/login`. `supabase/migrations/0002_auth_provisioning.sql`
 adds an `auth.users` trigger that auto-creates a `clients` row + `client_members` (owner)
 row for every signup, so a brand-new account can submit an audit immediately with no
-manual SQL. `POST /api/audits` resolves `client_id` server-side from the caller's own
-membership — it never trusts a client_id from the request body. `src/middleware.ts`
-redirects unauthenticated visitors to `/login` for every non-API route.
+manual SQL. `src/middleware.ts` redirects unauthenticated visitors to `/login` for every
+non-API route.
+
+### Multi-workspace
+
+A user can belong to more than one `client_members` row (the agency case — one login,
+several client brands). `src/lib/workspace.ts` resolves the "active" workspace from the
+`active_client_id` cookie (verified against real membership, never trusted blindly),
+falling back to the first one; `src/app/workspace-switcher.tsx` + `workspace-actions.ts`
+let a signed-in user switch between their workspaces or spin up an additional one.
+`POST /api/audits` always resolves `client_id` from this active workspace server-side —
+it never trusts a client_id from the request body.
 
 ## Setup
 
@@ -158,10 +177,10 @@ Known gaps / v1.1+ (see spec Part D1 phases 3, 5, 8 and Part F):
 - Scoring weights (`src/lib/config/scoring-weights.ts`) and module-scorer heuristics
   (`src/modules/scoring/module-scorers.ts`) are v1 heuristics — tune against real client
   data before relying on absolute score values.
-- Auth is single-workspace-per-user only (one `client_members` row per signup, picked
-  automatically). Agencies managing multiple clients need a workspace switcher — not
-  built yet.
-- Semantic proximity (`src/modules/semantic`) has working embed/cosine-similarity
-  helpers and a pgvector column (`audit_pages.embedding`) ready for them, but the
-  pipeline doesn't call them yet — entity/relationship-depth scoring is used instead.
-  Wire `embedText()` into `pipeline.ts` and store the result in that column next.
+- No "invite a teammate to an existing client" flow yet — an agency user can create and
+  switch between several of their own workspaces (`src/app/workspace-switcher.tsx`,
+  `src/app/workspace-actions.ts`), but adding a *second person* to a client they didn't
+  create isn't built. Would need an invite/pending-membership table.
+- Scoring weight calibration (`src/modules/calibration`) needs real accumulated
+  `rank_history` data before its suggestions mean anything — see that module's own
+  doc comment.

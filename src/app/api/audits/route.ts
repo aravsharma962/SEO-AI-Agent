@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getActiveWorkspace } from "@/lib/workspace";
 import { runAuditPipeline } from "@/modules/pipeline";
 import type { AuditInput } from "@/types/audit";
 
@@ -24,11 +25,11 @@ const AuditInputSchema = z.object({
 /**
  * POST /api/audits — triggers a new audit (Part B1: "API routes (trigger
  * audit, poll status, fetch report)"). Resolves client_id server-side from
- * the caller's own client_members row (never trusts a client_id in the
- * request body — see supabase/migrations/0002_auth_provisioning.sql for
- * how every signup gets exactly one client), creates the audit_runs row
- * under RLS, then kicks off the pipeline in the background and returns
- * immediately with the run id for polling via GET /api/audits/[id].
+ * the caller's ACTIVE workspace (the active_client_id cookie, verified
+ * against real membership — see src/lib/workspace.ts; never trusts a
+ * client_id in the request body), creates the audit_runs row under RLS,
+ * then kicks off the pipeline in the background and returns immediately
+ * with the run id for polling via GET /api/audits/[id].
  */
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -44,19 +45,15 @@ export async function POST(request: NextRequest) {
   const input = parsed.data;
   const supabase = createSupabaseServerClient();
 
-  const { data: authData } = await supabase.auth.getUser();
-  if (!authData?.user) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
     return NextResponse.json({ status: "error", message: "Not authenticated" }, { status: 401 });
   }
 
-  const { data: membership } = await supabase
-    .from("client_members")
-    .select("client_id")
-    .eq("user_id", authData.user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) {
+  const workspace = await getActiveWorkspace(supabase);
+  if (!workspace) {
     return NextResponse.json(
       { status: "error", message: "No client workspace found for this user" },
       { status: 403 }
@@ -66,12 +63,12 @@ export async function POST(request: NextRequest) {
   const { data: auditRun, error } = await supabase
     .from("audit_runs")
     .insert({
-      client_id: membership.client_id,
+      client_id: workspace.clientId,
       target_keyword: input.target_keyword,
       location: input.location ?? null,
       industry: input.industry ?? null,
       page_type: input.page_type ?? null,
-      created_by: authData.user.id,
+      created_by: user.id,
     })
     .select("id")
     .single();
@@ -89,7 +86,7 @@ export async function POST(request: NextRequest) {
   // response is sent (Vercel Fluid Compute background work — see B3). If
   // audits grow past what this comfortably covers within maxDuration
   // below, move runAuditPipeline onto the Hostinger VPS worker instead.
-  waitUntil(runAuditPipeline(auditRun.id, auditInput));
+  waitUntil(runAuditPipeline(auditRun.id, auditInput, workspace.clientId));
 
   return NextResponse.json({ status: "pending", audit_run_id: auditRun.id }, { status: 202 });
 }

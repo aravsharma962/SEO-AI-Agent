@@ -9,6 +9,7 @@ import type {
 } from "@/types/audit";
 import { exportReportToExcel } from "@/lib/export-xlsx";
 import { getOptimizationLevel } from "@/lib/optimization-level";
+import RankHistory from "./rank-history";
 
 function domainOf(url: string): string {
   try {
@@ -231,6 +232,8 @@ export default function ReportView({
                     </ul>
                   </div>
                 )}
+
+                <RankHistory auditRunId={auditRunId} url={url} />
               </div>
             );
           })}

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getWorkspace } from "@/lib/workspace";
+import { getActiveWorkspace, getUserWorkspaces } from "@/lib/workspace";
 import DeleteAuditButton from "./delete-button";
+import WorkspaceSwitcher from "../workspace-switcher";
 
 const STATUS_STYLES: Record<string, string> = {
   complete: "bg-emerald-50 text-emerald-700",
@@ -13,8 +14,10 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default async function HistoryPage() {
   const supabase = createSupabaseServerClient();
-  const workspace = await getWorkspace(supabase);
+  const workspace = await getActiveWorkspace(supabase);
   if (!workspace) redirect("/login");
+
+  const workspaces = await getUserWorkspaces(supabase);
 
   const { data: runs } = await supabase
     .from("audit_runs")
@@ -24,12 +27,14 @@ export default async function HistoryPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-semibold">Audit History</h1>
-          <p className="mt-1 text-sm text-slate-600">{workspace.clientName}</p>
+          <div className="mt-2">
+            <WorkspaceSwitcher workspaces={workspaces} activeClientId={workspace.clientId} />
+          </div>
         </div>
-        <Link href="/" className="text-sm text-slate-600 underline">
+        <Link href="/" className="flex-none text-sm text-slate-600 underline">
           New audit
         </Link>
       </div>

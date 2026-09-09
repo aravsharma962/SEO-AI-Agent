@@ -302,6 +302,7 @@ export interface ExtractedPage {
   url: string;
   observed_rank: number | null;
   serp_check: SerpCheckResult | null;
+  embedding: number[] | null;
   on_page: OnPageData;
   content: ContentArchitecture;
   entities: Entity[];

@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getWorkspace } from "@/lib/workspace";
+import { getActiveWorkspace, getUserWorkspaces } from "@/lib/workspace";
 import AuditDashboard from "./audit-dashboard";
 
 export default async function HomePage() {
   const supabase = createSupabaseServerClient();
-  const workspace = await getWorkspace(supabase);
+  const workspace = await getActiveWorkspace(supabase);
 
   if (!workspace) {
     const {
@@ -26,5 +26,13 @@ export default async function HomePage() {
     );
   }
 
-  return <AuditDashboard clientName={workspace.clientName} userEmail={workspace.userEmail} />;
+  const workspaces = await getUserWorkspaces(supabase);
+
+  return (
+    <AuditDashboard
+      userEmail={workspace.userEmail}
+      workspaces={workspaces}
+      activeClientId={workspace.clientId}
+    />
+  );
 }

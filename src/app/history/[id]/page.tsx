@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getWorkspace } from "@/lib/workspace";
+import { getActiveWorkspace } from "@/lib/workspace";
 import AuditView from "../../audit-view";
 
 export default async function HistoryDetailPage({ params }: { params: { id: string } }) {
   const supabase = createSupabaseServerClient();
-  const workspace = await getWorkspace(supabase);
+  const workspace = await getActiveWorkspace(supabase);
   if (!workspace) redirect("/login");
 
   return (
