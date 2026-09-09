@@ -25,6 +25,7 @@ export function assembleReport(params: {
       projected: params.comparison.projected_scores[s.url],
       coverage: s.coverage,
       observed_rank: page?.observed_rank ?? null,
+      serp_check_note: page?.serp_check?.note,
     };
   });
 

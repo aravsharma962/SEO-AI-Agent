@@ -292,9 +292,16 @@ export interface Recommendation {
 // Fully assembled per-page + comparison records (persisted in Supabase)
 // ---------------------------------------------------------------------------
 
+export interface SerpCheckResult {
+  observed_rank: number | null; // 1-10, or null if not found in top 10
+  checked_at: string;
+  note: string;
+}
+
 export interface ExtractedPage {
   url: string;
   observed_rank: number | null;
+  serp_check: SerpCheckResult | null;
   on_page: OnPageData;
   content: ContentArchitecture;
   entities: Entity[];
@@ -360,7 +367,13 @@ export interface AuditReportResponse {
   };
   scores?: Record<
     string,
-    { current: number; projected?: number; coverage: number; observed_rank?: number | null }
+    {
+      current: number;
+      projected?: number;
+      coverage: number;
+      observed_rank?: number | null;
+      serp_check_note?: string;
+    }
   >;
   ranking_hypothesis?: RankingHypothesisItem[];
   recommendations?: Recommendation[];

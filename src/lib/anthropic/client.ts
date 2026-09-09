@@ -28,6 +28,7 @@ export async function callClaudeForJson<T>(params: {
   system: string;
   user: string;
   maxTokens?: number;
+  tools?: Anthropic.ToolUnion[];
 }): Promise<T> {
   const client = getAnthropicClient();
 
@@ -38,9 +39,14 @@ export async function callClaudeForJson<T>(params: {
     max_tokens: maxTokens,
     system: params.system,
     messages: [{ role: "user", content: params.user }],
+    ...(params.tools ? { tools: params.tools } : {}),
   });
 
-  const textBlock = response.content.find((block) => block.type === "text");
+  // With server tools (e.g. web_search) Claude may emit text before and
+  // after the tool call — the JSON answer is in the LAST text block, not
+  // necessarily the first.
+  const textBlocks = response.content.filter((block) => block.type === "text");
+  const textBlock = textBlocks[textBlocks.length - 1];
   if (!textBlock || textBlock.type !== "text") {
     throw new Error("Claude response did not contain a text block");
   }

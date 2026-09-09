@@ -172,13 +172,16 @@ export default function ReportView({
               <div key={url} className={`rounded-lg border border-slate-200 bg-white p-5 border-t-4 ${style.top}`}>
                 <div className="flex flex-wrap items-baseline gap-2">
                   <span className={`rounded px-1.5 py-0.5 font-mono text-xs font-semibold ${style.badge}`}>
-                    RANK #{s.observed_rank ?? i + 1}
+                    {s.observed_rank ? `RANK #${s.observed_rank}` : "RANK NOT IN TOP 10"}
                   </span>
                   <span className="text-base font-semibold text-slate-900">{domainOf(url)}</span>
                 </div>
                 <a href={url} target="_blank" rel="noopener noreferrer" className="mt-1 block truncate text-xs text-slate-400 hover:text-slate-600">
                   {pathOf(url)}
                 </a>
+                {s.serp_check_note && (
+                  <p className="mt-1 text-xs italic text-slate-400">Live check: {s.serp_check_note}</p>
+                )}
 
                 <div className="mt-4 space-y-2.5">
                   <Meter label="CURRENT" value={s.current} fillClass={style.fill} />

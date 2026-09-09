@@ -8,6 +8,7 @@ import { analyzeSentiment } from "@/modules/sentiment";
 import { analyzeEeat } from "@/modules/eeat";
 import { analyzeExperience } from "@/modules/experience";
 import { analyzeLocalSeo } from "@/modules/local-seo";
+import { checkSerpPosition } from "@/modules/serp-check";
 import { fetchAuthorityData } from "@/lib/dataforseo/client";
 import { scoreAllPages } from "@/modules/scoring";
 import { buildComparison } from "@/modules/comparison";
@@ -54,18 +55,25 @@ export async function runAuditPipeline(auditRunId: string, input: AuditInput): P
       const socialMetadata = extractSocialMetadata(html);
       const technical = extractTechnical(html, httpStatus, onPage.robots);
 
-      const [entityResult, sentiment, eeat, experience, local, authority] = await Promise.all([
+      const [entityResult, sentiment, eeat, experience, local, authority, serpCheck] = await Promise.all([
         extractEntitiesAndRelationships({ targetKeyword: input.target_keyword, pageText }),
         analyzeSentiment(pageText),
         analyzeEeat(pageText),
         analyzeExperience(pageText),
         analyzeLocalSeo({ pageText, location: input.location }),
         fetchAuthorityData(pageInput.url),
+        checkSerpPosition({ targetKeyword: input.target_keyword, url: pageInput.url, location: input.location }),
       ]);
+
+      // Live-verified rank wins when the search actually found the page in
+      // the top 10; otherwise fall back to whatever the caller supplied
+      // rather than discarding it outright.
+      const observedRank = serpCheck.observed_rank ?? pageInput.observed_rank ?? null;
 
       const extractedPage: ExtractedPage = {
         url: pageInput.url,
-        observed_rank: pageInput.observed_rank ?? null,
+        observed_rank: observedRank,
+        serp_check: serpCheck,
         on_page: onPage,
         content,
         entities: entityResult.entities,
@@ -87,6 +95,7 @@ export async function runAuditPipeline(auditRunId: string, input: AuditInput): P
         audit_run_id: auditRunId,
         url: extractedPage.url,
         observed_rank: extractedPage.observed_rank,
+        serp_check: extractedPage.serp_check,
         on_page: extractedPage.on_page,
         content: extractedPage.content,
         entities: extractedPage.entities,

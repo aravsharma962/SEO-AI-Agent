@@ -30,7 +30,7 @@ export default function AuditDashboard({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         target_keyword: keyword,
-        pages: [{ url: urlA, observed_rank: 1 }, { url: urlB, observed_rank: 2 }],
+        pages: [{ url: urlA }, { url: urlB }],
       }),
     });
 
