@@ -47,6 +47,7 @@ deterministic TypeScript.
 | Module | Layer | File |
 |---|---|---|
 | SERP intent | Claude | `src/modules/serp-intent` |
+| Live SERP rank verification | Claude + `web_search` tool | `src/modules/serp-check` |
 | Page crawl / extraction | Code | `src/modules/extraction` |
 | Content architecture mapping | Code | `src/modules/content-architecture` |
 | Entity extraction + relationships | Claude | `src/modules/entities` |
@@ -62,6 +63,16 @@ deterministic TypeScript.
 | Ranking hypothesis + recommendations | Claude (guardrail-constrained) | `src/modules/comparison/ranking-hypothesis.ts` |
 | Report assembly | Code | `src/modules/report` |
 | Orchestration | Code | `src/modules/pipeline.ts` |
+
+### Live rank verification
+
+Rather than trust whatever order URLs are submitted in, `src/modules/serp-check` uses
+Claude with the server-side `web_search` tool to actually search for the target keyword
+and check whether each URL appears in the top 10 organic results before the audit runs.
+`observed_rank` on `ExtractedPage` is the live-verified value (falling back to a
+caller-supplied hint only if the search comes back inconclusive) — never a guess based on
+submission order. Adds ~2 extra Claude calls per audit (one per page); see the note in
+`src/modules/serp-check/index.ts` on why this never throws.
 
 ### Guardrails (spec A4/A10/A11)
 

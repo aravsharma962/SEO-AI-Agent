@@ -57,6 +57,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
   const pages: ExtractedPage[] = pageRows.map((row) => ({
     url: row.url,
     observed_rank: row.observed_rank,
+    serp_check: row.serp_check,
     on_page: row.on_page,
     content: row.content,
     entities: row.entities,
