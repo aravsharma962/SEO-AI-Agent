@@ -12,9 +12,13 @@ const ALL_MODULES = Object.keys(SCORING_WEIGHTS) as ScoreModule[];
  * the remaining modules, per A9: "mark the authority score provisional or
  * exclude it from the normalized total rather than guessing."
  */
-export function scorePage(page: ExtractedPage, allPages: ExtractedPage[]): PageScoreSummary {
+export function scorePage(
+  page: ExtractedPage,
+  allPages: ExtractedPage[],
+  targetKeywordEmbedding?: number[] | null
+): PageScoreSummary {
   const moduleScores: ModuleScore[] = ALL_MODULES.map((module) => {
-    const scored = MODULE_SCORERS[module](page, allPages);
+    const scored = MODULE_SCORERS[module](page, allPages, targetKeywordEmbedding);
     return { ...scored, weight: SCORING_WEIGHTS[module] };
   });
 
@@ -36,8 +40,11 @@ export function scorePage(page: ExtractedPage, allPages: ExtractedPage[]): PageS
   };
 }
 
-export function scoreAllPages(pages: ExtractedPage[]): PageScoreSummary[] {
-  return pages.map((page) => scorePage(page, pages));
+export function scoreAllPages(
+  pages: ExtractedPage[],
+  targetKeywordEmbedding?: number[] | null
+): PageScoreSummary[] {
+  return pages.map((page) => scorePage(page, pages, targetKeywordEmbedding));
 }
 
 /**

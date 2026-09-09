@@ -1,5 +1,6 @@
 import type { ExtractedPage, ModuleScore, ScoreModule } from "@/types/audit";
 import { KNOWN_SCHEMA_TYPE_COUNT } from "./constants";
+import { semanticProximity } from "@/modules/semantic";
 
 const DEPTH_WEIGHT: Record<string, number> = {
   mention: 1,
@@ -49,7 +50,8 @@ export function scoreContentArchitecture(
 
 export function scoreEntitiesSemantic(
   page: ExtractedPage,
-  allPages: ExtractedPage[]
+  allPages: ExtractedPage[],
+  targetKeywordEmbedding?: number[] | null
 ): ModuleScore {
   const unionEntities = new Set<string>();
   allPages.forEach((p) => p.entities.forEach((e) => unionEntities.add(e.name.toLowerCase())));
@@ -71,7 +73,17 @@ export function scoreEntitiesSemantic(
         page.entity_relationships.length /
         4;
 
-  const rawScore = entityCoverage * 0.5 + avgDepth * 100 * 0.5;
+  // Semantic proximity (page embedding <-> target keyword embedding) folds
+  // in as a third component only when Voyage AI embeddings are actually
+  // available (VOYAGE_API_KEY set) — otherwise this degrades gracefully
+  // back to the original 50/50 split rather than guessing a proximity
+  // value, same "provisional when data is missing" pattern as authority.
+  const proximity = semanticProximity(page.embedding ?? null, targetKeywordEmbedding ?? null);
+
+  const rawScore =
+    proximity === null
+      ? entityCoverage * 0.5 + avgDepth * 100 * 0.5
+      : entityCoverage * 0.4 + avgDepth * 100 * 0.3 + proximity * 100 * 0.3;
 
   return {
     module: "entities_semantic",
@@ -80,7 +92,9 @@ export function scoreEntitiesSemantic(
     provisional: false,
     confidence: "medium",
     notes:
-      "50% entity coverage relative to union across compared pages, 50% average relationship depth (mention < paragraph < subsection < full_section).",
+      proximity === null
+        ? "50% entity coverage relative to union across compared pages, 50% average relationship depth (mention < paragraph < subsection < full_section). Semantic proximity not available (VOYAGE_API_KEY unset)."
+        : "40% entity coverage, 30% average relationship depth, 30% semantic proximity of page content to the target keyword (Voyage AI embeddings).",
   };
 }
 
@@ -224,7 +238,7 @@ export function scoreAuthority(
 
 export const MODULE_SCORERS: Record<
   ScoreModule,
-  (page: ExtractedPage, allPages: ExtractedPage[]) => ModuleScore
+  (page: ExtractedPage, allPages: ExtractedPage[], targetKeywordEmbedding?: number[] | null) => ModuleScore
 > = {
   content_architecture: scoreContentArchitecture,
   entities_semantic: scoreEntitiesSemantic,

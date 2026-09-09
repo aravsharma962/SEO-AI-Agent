@@ -9,6 +9,7 @@ import { analyzeEeat } from "@/modules/eeat";
 import { analyzeExperience } from "@/modules/experience";
 import { analyzeLocalSeo } from "@/modules/local-seo";
 import { checkSerpPosition } from "@/modules/serp-check";
+import { embedText } from "@/modules/semantic";
 import { fetchAuthorityData } from "@/lib/dataforseo/client";
 import { scoreAllPages } from "@/modules/scoring";
 import { buildComparison } from "@/modules/comparison";
@@ -27,7 +28,11 @@ import * as cheerio from "cheerio";
  * host (Hostinger VPS per B3) — it only depends on env vars + Supabase,
  * not on the Next.js request/response cycle.
  */
-export async function runAuditPipeline(auditRunId: string, input: AuditInput): Promise<void> {
+export async function runAuditPipeline(
+  auditRunId: string,
+  input: AuditInput,
+  clientId: string
+): Promise<void> {
   let supabase: ReturnType<typeof createSupabaseServiceClient> | undefined;
 
   try {
@@ -42,6 +47,11 @@ export async function runAuditPipeline(auditRunId: string, input: AuditInput): P
 
     await supabase.from("audit_runs").update({ search_intent: intent }).eq("id", auditRunId);
 
+    // null when VOYAGE_API_KEY is unset — semantic proximity then degrades
+    // gracefully in scoreEntitiesSemantic rather than guessing (see
+    // src/modules/scoring/module-scorers.ts).
+    const targetKeywordEmbedding = await embedText(input.target_keyword);
+
     const extractedPages: ExtractedPage[] = [];
 
     for (const pageInput of input.pages) {
@@ -55,7 +65,7 @@ export async function runAuditPipeline(auditRunId: string, input: AuditInput): P
       const socialMetadata = extractSocialMetadata(html);
       const technical = extractTechnical(html, httpStatus, onPage.robots);
 
-      const [entityResult, sentiment, eeat, experience, local, authority, serpCheck] = await Promise.all([
+      const [entityResult, sentiment, eeat, experience, local, authority, serpCheck, embedding] = await Promise.all([
         extractEntitiesAndRelationships({ targetKeyword: input.target_keyword, pageText }),
         analyzeSentiment(pageText),
         analyzeEeat(pageText),
@@ -63,6 +73,7 @@ export async function runAuditPipeline(auditRunId: string, input: AuditInput): P
         analyzeLocalSeo({ pageText, location: input.location }),
         fetchAuthorityData(pageInput.url),
         checkSerpPosition({ targetKeyword: input.target_keyword, url: pageInput.url, location: input.location }),
+        embedText(pageText),
       ]);
 
       // Live-verified rank wins when the search actually found the page in
@@ -74,6 +85,7 @@ export async function runAuditPipeline(auditRunId: string, input: AuditInput): P
         url: pageInput.url,
         observed_rank: observedRank,
         serp_check: serpCheck,
+        embedding,
         on_page: onPage,
         content,
         entities: entityResult.entities,
@@ -96,6 +108,7 @@ export async function runAuditPipeline(auditRunId: string, input: AuditInput): P
         url: extractedPage.url,
         observed_rank: extractedPage.observed_rank,
         serp_check: extractedPage.serp_check,
+        embedding: extractedPage.embedding,
         on_page: extractedPage.on_page,
         content: extractedPage.content,
         entities: extractedPage.entities,
@@ -109,9 +122,23 @@ export async function runAuditPipeline(auditRunId: string, input: AuditInput): P
         authority: extractedPage.authority,
         sentiment: extractedPage.sentiment,
       });
+
+      // Seeds rank_history immediately so there's a first data point
+      // without waiting for the next cron cycle (see
+      // src/app/api/cron/rank-check/route.ts, which appends to this same
+      // table on a recurring schedule).
+      await supabase.from("rank_history").insert({
+        client_id: clientId,
+        audit_run_id: auditRunId,
+        target_keyword: input.target_keyword,
+        url: extractedPage.url,
+        observed_rank: extractedPage.observed_rank,
+        note: extractedPage.serp_check?.note ?? null,
+        checked_at: extractedPage.serp_check?.checked_at ?? new Date().toISOString(),
+      });
     }
 
-    const scores = scoreAllPages(extractedPages);
+    const scores = scoreAllPages(extractedPages, targetKeywordEmbedding);
     extractedPages.forEach((page, i) => {
       page.scores = scores[i] ?? null;
     });

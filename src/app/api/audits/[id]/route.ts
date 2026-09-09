@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { assembleReport } from "@/modules/report";
+import { parseEmbedding } from "@/modules/semantic";
 import type { ExtractedPage, PageScoreSummary, SerpIntentResult } from "@/types/audit";
 
 /**
@@ -58,6 +59,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     url: row.url,
     observed_rank: row.observed_rank,
     serp_check: row.serp_check,
+    embedding: parseEmbedding(row.embedding),
     on_page: row.on_page,
     content: row.content,
     entities: row.entities,

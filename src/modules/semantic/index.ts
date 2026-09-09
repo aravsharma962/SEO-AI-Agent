@@ -38,6 +38,26 @@ export async function embedText(text: string): Promise<number[] | null> {
   }
 }
 
+/**
+ * pgvector columns read back through PostgREST can come back as a plain
+ * JS array or as a stringified "[0.1,0.2,...]" depending on the Postgres/
+ * PostgREST version — normalize defensively rather than assume, since a
+ * raw string silently "works" with array-shaped code (it has .length and
+ * indexable characters) while producing meaningless similarity numbers.
+ */
+export function parseEmbedding(value: unknown): number[] | null {
+  if (Array.isArray(value)) return value as number[];
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length || a.length === 0) return 0;
 

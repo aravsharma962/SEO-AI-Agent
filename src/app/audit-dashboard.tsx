@@ -5,13 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import AuditView from "./audit-view";
+import WorkspaceSwitcher from "./workspace-switcher";
+import type { WorkspaceSummary } from "@/lib/workspace";
 
 export default function AuditDashboard({
-  clientName,
   userEmail,
+  workspaces,
+  activeClientId,
 }: {
-  clientName: string;
   userEmail: string;
+  workspaces: WorkspaceSummary[];
+  activeClientId: string;
 }) {
   const [keyword, setKeyword] = useState("");
   const [urlA, setUrlA] = useState("");
@@ -53,16 +57,20 @@ export default function AuditDashboard({
 
   return (
     <main className={`mx-auto px-6 py-12 ${auditRunId ? "max-w-4xl" : "max-w-3xl"}`}>
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-semibold">SEO AI Agent</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {clientName} — signed in as {userEmail}
-          </p>
+          <p className="mt-1 text-sm text-slate-600">Signed in as {userEmail}</p>
+          <div className="mt-2">
+            <WorkspaceSwitcher workspaces={workspaces} activeClientId={activeClientId} />
+          </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-none items-center gap-4">
           <Link href="/history" className="text-sm text-slate-600 underline">
             Audit history
+          </Link>
+          <Link href="/calibration" className="text-sm text-slate-600 underline">
+            Calibration
           </Link>
           <button onClick={handleSignOut} className="text-sm text-slate-600 underline">
             Sign out
