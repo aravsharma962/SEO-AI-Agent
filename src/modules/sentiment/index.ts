@@ -1,11 +1,11 @@
 import { callClaudeForJson } from "@/lib/anthropic/client";
 import type { SentimentData } from "@/types/audit";
 
-const SYSTEM_PROMPT = `You are a diagnostic content-tone classifier for medical/local-service SEO pages.
+const SYSTEM_PROMPT = `You are a diagnostic content-tone classifier for SEO pages in ANY industry.
 This is NOT a ranking signal — it only describes tone so an SEO analyst can see whether
 copy reads as clinical/informational vs. promotional/sales-driven.
-Detect unsubstantiated promotional phrases such as: "100% safe", "no recurrence",
-"permanent results for everyone", "best surgeon", "world-class", "guaranteed results".
+Detect unsubstantiated promotional phrases such as: "100% guaranteed", "risk-free", "no side
+effects", "permanent results for everyone", "best in the world", "#1 rated", "world-class".
 
 Respond with ONLY a JSON object:
 {"tone": "clinical|promotional|mixed|neutral", "promotional_phrases_detected": ["..."]}

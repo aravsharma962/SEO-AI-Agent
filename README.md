@@ -5,6 +5,10 @@ A **Comparative Ranking Diagnostic and Optimization System**: given a target key
 identifies actionable content/entity/E-E-A-T/technical gaps, and calculates a current vs.
 projected optimization score — never a rank guarantee.
 
+Works across any industry — plug in any two page URLs, medical, financial, legal, SaaS,
+e-commerce, home services, whatever — and it detects the appropriate content category itself
+(see "Multi-industry + YMYL-aware analysis" below) rather than assuming one vertical.
+
 Full product spec: see the master spec document supplied at project kickoff (Parts A–F).
 This README covers what's actually implemented (Phase 1 "Foundation" + a working thin
 vertical slice per the spec's Part D2) and how to run it.
@@ -49,8 +53,7 @@ deterministic TypeScript.
 | SERP intent | Claude | `src/modules/serp-intent` |
 | Live SERP rank verification | Claude + `web_search` tool | `src/modules/serp-check` |
 | Page crawl / extraction | Code | `src/modules/extraction` |
-| Content architecture mapping | Code | `src/modules/content-architecture` |
-| Entity extraction + relationships | Claude | `src/modules/entities` |
+| Entity extraction + relationships + content-section labeling | Claude | `src/modules/entities` |
 | Semantic proximity | Code (pgvector + Voyage embeddings) | `src/modules/semantic` |
 | Sentiment | Claude (diagnostic only) | `src/modules/sentiment` |
 | E-E-A-T | Claude (checklist-guided) | `src/modules/eeat` |
@@ -94,6 +97,30 @@ one genuinely agentic piece here — it decides what's signal, it isn't told. Fl
 changes show up as a "Page Activity" panel on the report once any exist
 (`src/app/page-changes-panel.tsx`). Since this watches the same tracked set as rank
 tracking, it also catches unexpected changes to your *own* site, not just competitors'.
+
+### Multi-industry + YMYL-aware analysis
+
+Nothing about entity types, content sections, or the E-E-A-T/experience/local checklists is
+hard-coded to one vertical:
+
+- **Content sections** (`src/modules/entities`) are labeled by Claude per audit, not matched
+  against a fixed keyword list — a medical audit and a SaaS pricing-page audit get entirely
+  different section vocabularies (e.g. `dosage` vs. `pricing_tiers`), and gap classification
+  only ever compares the *distribution* of labels across pages, never their specific values, so
+  it works unchanged regardless of industry.
+- **Entities** use a generalized type set (`core_subject`, `person_or_expert`, `cost_or_pricing`,
+  etc. — see `EntityType` in `src/types/audit.ts`) that fits a condition/procedure just as well
+  as a financial product or a legal matter.
+- **E-E-A-T** (`src/modules/eeat`) first classifies each page's `content_category` — one of
+  `ymyl_medical`, `ymyl_financial`, `ymyl_legal`, `ymyl_safety`, or `general` — in the same
+  Claude call that scores the checklist, then `scoreEeat` (`src/modules/scoring/module-scorers.ts`)
+  applies a harsher penalty for unsubstantiated claims on YMYL categories than on general content,
+  matching Google's own stricter bar for "Your Money or Your Life" pages without forcing
+  medical-specific checks (license numbers, "medically reviewed by") onto pages that aren't YMYL.
+- **Experience / Local SEO** (`src/modules/experience`, `src/modules/local-seo`) use
+  industry-neutral field names (`customer_reviews`, `outcome_evidence`,
+  `named_practitioners_or_staff`, `provider_city_association`, etc.) that read naturally whether
+  the page is a clinic, a law firm, or an online store.
 
 ### Guardrails (spec A4/A10/A11)
 

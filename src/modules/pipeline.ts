@@ -1,7 +1,6 @@
 import type { AuditInput, ExtractedPage } from "@/types/audit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { fetchPage, extractOnPage, extractSchema, extractSocialMetadata, extractTechnical } from "@/modules/extraction";
-import { mapContentArchitecture } from "@/modules/content-architecture";
 import { classifySearchIntent } from "@/modules/serp-intent";
 import { extractEntitiesAndRelationships } from "@/modules/entities";
 import { analyzeSentiment } from "@/modules/sentiment";
@@ -60,13 +59,16 @@ export async function runAuditPipeline(
       const pageText = $("body").text().replace(/\s+/g, " ").trim();
 
       const onPage = extractOnPage(html, httpStatus);
-      const content = mapContentArchitecture(onPage.headings);
       const schemaData = extractSchema(html);
       const socialMetadata = extractSocialMetadata(html);
       const technical = extractTechnical(html, httpStatus, onPage.robots);
 
       const [entityResult, sentiment, eeat, experience, local, authority, serpCheck, embedding] = await Promise.all([
-        extractEntitiesAndRelationships({ targetKeyword: input.target_keyword, pageText }),
+        extractEntitiesAndRelationships({
+          targetKeyword: input.target_keyword,
+          pageText,
+          headings: onPage.headings,
+        }),
         analyzeSentiment(pageText),
         analyzeEeat(pageText),
         analyzeExperience(pageText),
@@ -87,7 +89,7 @@ export async function runAuditPipeline(
         serp_check: serpCheck,
         embedding,
         on_page: onPage,
-        content,
+        content: entityResult.content,
         entities: entityResult.entities,
         entity_relationships: entityResult.relationships,
         schema_data: schemaData,

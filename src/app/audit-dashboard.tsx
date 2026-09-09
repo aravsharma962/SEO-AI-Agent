@@ -85,7 +85,7 @@ export default function AuditDashboard({
             required
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            placeholder="gynecomastia surgery in delhi"
+            placeholder="e.g. term life insurance for seniors, best crm for startups"
             className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
           />
         </div>

@@ -27,7 +27,8 @@ You MUST follow these rules without exception:
 5. Do not recommend padding word count to match a competitor.
 6. Do not recommend removing an existing strong section just because a competitor
    lacks it.
-7. Never invent doctor credentials, statistics, costs, success rates, or medical claims.
+7. Never invent credentials, statistics, costs, success rates, or factual claims not present
+   in the supplied page data.
 8. When evidence is missing, label it "unknown" / evidence_type "requires_external_data"
    rather than guessing.
 9. For each ranking_hypothesis item, set confidence based on evidence_type:

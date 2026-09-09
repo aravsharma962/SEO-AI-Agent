@@ -8,10 +8,7 @@ const VALID_INTENTS: SearchIntent[] = [
   "commercial",
   "transactional",
   "local",
-  "medical",
-  "procedure",
   "cost",
-  "doctor",
   "comparison",
   "navigational",
 ];
