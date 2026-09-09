@@ -84,6 +84,17 @@ old, up to 20 per run to bound cost — this is the "automated SERP tracking" /
 env vars so the cron endpoint only accepts Vercel's own signed requests. History shows up
 on the report itself once a page has 2+ data points (`src/app/rank-history.tsx`).
 
+### Competitor / page change monitoring
+
+A second cron job (`vercel.json` → `/api/cron/competitor-watch`, weekly) re-fetches every
+tracked page, hashes the content, and — only when the hash actually changed — asks Claude
+to judge whether the diff is SEO-relevant (`src/modules/competitor-watch`). Most real
+page diffs are noise (ads, timestamps, unrelated widget content); the Claude call is the
+one genuinely agentic piece here — it decides what's signal, it isn't told. Flagged
+changes show up as a "Page Activity" panel on the report once any exist
+(`src/app/page-changes-panel.tsx`). Since this watches the same tracked set as rank
+tracking, it also catches unexpected changes to your *own* site, not just competitors'.
+
 ### Guardrails (spec A4/A10/A11)
 
 Enforced primarily via the system prompts in `src/modules/comparison/ranking-hypothesis.ts`,

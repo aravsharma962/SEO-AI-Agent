@@ -10,6 +10,7 @@ import type {
 import { exportReportToExcel } from "@/lib/export-xlsx";
 import { getOptimizationLevel } from "@/lib/optimization-level";
 import RankHistory from "./rank-history";
+import PageChangesPanel from "./page-changes-panel";
 
 function domainOf(url: string): string {
   try {
@@ -369,6 +370,8 @@ export default function ReportView({
           </div>
         </section>
       )}
+
+      <PageChangesPanel auditRunId={auditRunId} />
 
       {/* Missing data / caveats */}
       <section id="coverage">
