@@ -1,6 +1,7 @@
 import type { AuditComparison, Confidence, ExtractedPage, PageScoreSummary, ScoreModule } from "@/types/audit";
 import { buildContentGaps } from "./gap-classification";
 import { generateRankingHypothesis } from "./ranking-hypothesis";
+import { generateContentBriefs } from "@/modules/content-brief";
 import { projectScore } from "@/modules/scoring";
 
 const CONFIDENCE_RANK: Record<Confidence, number> = { low: 0, medium: 1, high: 2 };
@@ -25,12 +26,19 @@ export async function buildComparison(params: {
 }): Promise<AuditComparison> {
   const contentGaps = buildContentGaps(params.pages);
 
-  const hypothesis = await generateRankingHypothesis({
-    targetKeyword: params.targetKeyword,
-    pages: params.pages,
-    scores: params.scores,
-    contentGaps,
-  });
+  const [hypothesis, contentBriefs] = await Promise.all([
+    generateRankingHypothesis({
+      targetKeyword: params.targetKeyword,
+      pages: params.pages,
+      scores: params.scores,
+      contentGaps,
+    }),
+    generateContentBriefs({
+      targetKeyword: params.targetKeyword,
+      contentGaps,
+      pages: params.pages,
+    }),
+  ]);
 
   const currentScores: Record<string, number> = {};
   const projectedScores: Record<string, number> = {};
@@ -71,6 +79,7 @@ export async function buildComparison(params: {
     semantic_gaps: contentGaps.filter((g) => g.gap_type === "opportunity_gap"),
     technical_gaps: [],
     authority_gaps: [],
+    content_briefs: contentBriefs,
     ranking_hypothesis: hypothesis.ranking_hypothesis.map((h) => ({
       ...h,
       confidence: normalizeConfidence(h.confidence),

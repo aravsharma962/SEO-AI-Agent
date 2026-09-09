@@ -122,6 +122,27 @@ hard-coded to one vertical:
   `named_practitioners_or_staff`, `provider_city_association`, etc.) that read naturally whether
   the page is a clinic, a law firm, or an online store.
 
+### Content briefs, schema recommendations, internal-link suggestions
+
+Three Part F items that don't need any external integration, so they're built now:
+
+- **Content briefs** (`src/modules/content-brief`) — one Claude call per audit turns the
+  highest-priority content gaps (`core_gap`/`differentiator_gap`) into structural writing
+  briefs: which sections to add, which entities to cover (drawn only from what's actually
+  evidenced on the pages that already cover the topic), and a suggested depth. These are
+  briefs for a writer, never drafted copy — the module never fabricates facts or claims.
+- **Schema recommendations** (`src/modules/schema-recommendations`) — per page, Claude judges
+  which schema.org types would be genuinely relevant additions *for that specific page*
+  (never a generic checklist — no Recipe schema on a law firm page) and generates
+  ready-to-paste JSON-LD using only values already evidenced in the extracted page data;
+  anything schema.org expects but the data doesn't support is omitted rather than invented.
+- **Internal-link suggestions** (`src/modules/internal-links`) — optional: pass
+  `internal_link_candidates` (other pages on your own site + a short topic description) and
+  mark your page `is_own_page: true` in the audit request, and Claude suggests specific,
+  natural internal links (anchor text + placement) from your page to those candidates. Skipped
+  entirely (not guessed) when no candidates are supplied — same missing-data pattern as
+  authority/semantic proximity.
+
 ### Guardrails (spec A4/A10/A11)
 
 Enforced primarily via the system prompts in `src/modules/comparison/ranking-hypothesis.ts`,
@@ -159,8 +180,8 @@ it never trusts a client_id from the request body.
 
 1. **Supabase**
    - Create a project, enable the `vector` extension (the migration does this too).
-   - Run `supabase/migrations/0001_init.sql` then `0002_auth_provisioning.sql` against it,
-     in that order (Supabase SQL editor, or the Supabase CLI: `supabase db push`).
+   - Run every file in `supabase/migrations/` against it in filename order (Supabase SQL
+     editor, or the Supabase CLI: `supabase db push`).
    - In Authentication → Providers → Email, "Confirm email" is on by default — either
      leave it on (users confirm via the email Supabase sends before their first sign-in)
      or turn it off for faster local testing.
@@ -189,7 +210,11 @@ directly from the browser after sign-in).
 
 ```
 POST /api/audits
-{ "target_keyword": "...", "pages": [{ "url": "..." }, { "url": "..." }] }
+{
+  "target_keyword": "...",
+  "pages": [{ "url": "...", "is_own_page": true }, { "url": "..." }],
+  "internal_link_candidates": [{ "url": "...", "topic": "..." }]  // optional
+}
 -> 202 { "status": "pending", "audit_run_id": "<uuid>" }
 
 GET /api/audits/{audit_run_id}

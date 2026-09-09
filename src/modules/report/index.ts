@@ -49,10 +49,19 @@ export function assembleReport(params: {
       schema_analysis: params.pages.map((p) => ({ url: p.url, schema: p.schema_data })),
       technical_analysis: params.pages.map((p) => ({ url: p.url, technical: p.technical })),
       authority_analysis: params.pages.map((p) => ({ url: p.url, authority: p.authority })),
+      schema_recommendations: params.pages.map((p) => ({
+        url: p.url,
+        recommendations: p.schema_recommendations,
+      })),
+      internal_link_suggestions: params.pages.map((p) => ({
+        url: p.url,
+        suggestions: p.internal_link_suggestions,
+      })),
     },
     scores: scoresByUrl,
     ranking_hypothesis: params.comparison.ranking_hypothesis,
     recommendations: params.comparison.recommendations,
+    content_briefs: params.comparison.content_briefs,
     missing_data: params.comparison.missing_data,
     confidence: params.comparison.confidence,
   };

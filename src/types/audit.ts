@@ -31,6 +31,15 @@ export type ContentCategory =
 export interface AuditPageInput {
   url: string;
   observed_rank?: number;
+  is_own_page?: boolean; // marks the page internal-link suggestions are generated for
+}
+
+// A same-site page the caller offers as a candidate internal-link target,
+// e.g. { url: "https://example.com/pricing", topic: "pricing and plans" }.
+// Only meaningful alongside an is_own_page: true entry in `pages`.
+export interface InternalLinkCandidate {
+  url: string;
+  topic: string;
 }
 
 export interface AuditInput {
@@ -41,6 +50,7 @@ export interface AuditInput {
   page_type?: string;
   country?: string;
   competitor_data_source?: "manual" | "crawler" | "api";
+  internal_link_candidates?: InternalLinkCandidate[];
 }
 
 export interface SerpIntentResult {
@@ -122,6 +132,22 @@ export interface SchemaData {
   types_present: string[]; // e.g. Article, FAQPage, Product, MedicalWebPage, LocalBusiness
   properties: Record<string, unknown>;
   missing_recommended: string[];
+}
+
+// Ready-to-paste JSON-LD for a schema type judged genuinely relevant to this
+// specific page and missing from it (src/modules/schema-recommendations) —
+// distinct from the raw missing_recommended coverage list above, which is
+// just "not present" with no relevance judgment or generated markup.
+export interface SchemaRecommendation {
+  schema_type: string;
+  json_ld: Record<string, unknown>;
+  rationale: string;
+}
+
+export interface InternalLinkSuggestion {
+  anchor_text: string;
+  link_to_url: string;
+  placement_context: string;
 }
 
 export interface SocialMetadata {
@@ -277,6 +303,19 @@ export interface Recommendation {
   rationale: string;
 }
 
+// A structural writing brief for a core_gap/differentiator_gap worth
+// actually writing content for — what to add and roughly how, never drafted
+// copy or invented facts (src/modules/content-brief).
+export interface ContentBrief {
+  topic: string; // matches a ContentGap.topic
+  gap_type: GapType;
+  target_page_urls: string[]; // pages missing this topic the brief is for
+  sections_to_add: string[];
+  key_entities_to_include: string[];
+  suggested_depth: MentionDepth;
+  brief: string;
+}
+
 // ---------------------------------------------------------------------------
 // Fully assembled per-page + comparison records (persisted in Supabase)
 // ---------------------------------------------------------------------------
@@ -304,6 +343,10 @@ export interface ExtractedPage {
   eeat: EeatData;
   experience: ExperienceData;
   local: LocalSeoData;
+  schema_recommendations: SchemaRecommendation[];
+  // null = not requested (no internal_link_candidates supplied for this
+  // page); [] = requested but nothing genuinely relevant was found.
+  internal_link_suggestions: InternalLinkSuggestion[] | null;
   scores: PageScoreSummary | null;
 }
 
@@ -313,6 +356,7 @@ export interface AuditComparison {
   semantic_gaps: ContentGap[];
   technical_gaps: ContentGap[];
   authority_gaps: ContentGap[];
+  content_briefs: ContentBrief[];
   ranking_hypothesis: RankingHypothesisItem[];
   recommendations: Recommendation[];
   current_scores: Record<string, number>;
@@ -354,6 +398,8 @@ export interface AuditReportResponse {
     schema_analysis: { url: string; schema: SchemaData }[];
     technical_analysis: { url: string; technical: TechnicalData }[];
     authority_analysis: { url: string; authority: AuthorityData }[];
+    schema_recommendations: { url: string; recommendations: SchemaRecommendation[] }[];
+    internal_link_suggestions: { url: string; suggestions: InternalLinkSuggestion[] | null }[];
   };
   scores?: Record<
     string,
@@ -367,6 +413,7 @@ export interface AuditReportResponse {
   >;
   ranking_hypothesis?: RankingHypothesisItem[];
   recommendations?: Recommendation[];
+  content_briefs?: ContentBrief[];
   missing_data?: string[];
   confidence?: Confidence | "medium-high";
 }

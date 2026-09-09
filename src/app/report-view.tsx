@@ -288,6 +288,41 @@ export default function ReportView({
         </section>
       )}
 
+      {/* Content briefs */}
+      {(report.content_briefs?.length ?? 0) > 0 && (
+        <section>
+          <SectionHead
+            eyebrow="Content Briefs"
+            title="What to write to close the top gaps"
+            note="Structural briefs for a writer — not drafted copy."
+          />
+          <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+            {report.content_briefs!.map((b, i) => (
+              <div key={i} className="px-4 py-3.5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-sm font-semibold capitalize text-slate-900">{b.topic.replace(/_/g, " ")}</p>
+                  <span className="font-mono text-xs text-slate-400">
+                    {GAP_TYPE_LABEL[b.gap_type]} · suggested depth: {b.suggested_depth.replace(/_/g, " ")}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">For: {b.target_page_urls.map(domainOf).join(", ")}</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{b.brief}</p>
+                {b.sections_to_add.length > 0 && (
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    <b className="text-slate-700">Sections to add:</b> {b.sections_to_add.join(" · ")}
+                  </p>
+                )}
+                {b.key_entities_to_include.length > 0 && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    <b className="text-slate-700">Include:</b> {b.key_entities_to_include.join(" · ")}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Ranking hypothesis */}
       {(report.ranking_hypothesis?.length ?? 0) > 0 && (
         <section>
@@ -367,6 +402,74 @@ export default function ReportView({
                   </div>
                 );
               })}
+          </div>
+        </section>
+      )}
+
+      {/* Schema recommendations */}
+      {audit.schema_recommendations.some((s) => s.recommendations.length > 0) && (
+        <section>
+          <SectionHead
+            eyebrow="Schema Recommendations"
+            title="Structured data to add"
+            note="Ready-to-paste JSON-LD, using only data actually present on each page — nothing fabricated."
+          />
+          <div className="space-y-6">
+            {audit.schema_recommendations
+              .filter((s) => s.recommendations.length > 0)
+              .map((s) => (
+                <div key={s.url}>
+                  <p className="mb-2 text-sm font-semibold text-slate-800">{domainOf(s.url)}</p>
+                  <div className="space-y-3">
+                    {s.recommendations.map((r, i) => (
+                      <details key={i} className="rounded-lg border border-slate-200 bg-white p-4">
+                        <summary className="cursor-pointer text-sm font-medium text-slate-900">
+                          {r.schema_type}
+                          <span className="ml-2 text-xs font-normal text-slate-400">{r.rationale}</span>
+                        </summary>
+                        <pre className="mt-3 max-h-72 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">
+                          {JSON.stringify(r.json_ld, null, 2)}
+                        </pre>
+                      </details>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
+
+      {/* Internal link suggestions */}
+      {audit.internal_link_suggestions.some((s) => (s.suggestions?.length ?? 0) > 0) && (
+        <section>
+          <SectionHead eyebrow="Internal Link Suggestions" title="Links to add from your page" />
+          <div className="space-y-6">
+            {audit.internal_link_suggestions
+              .filter((s) => (s.suggestions?.length ?? 0) > 0)
+              .map((s) => (
+                <div key={s.url}>
+                  <p className="mb-2 text-sm font-semibold text-slate-800">{domainOf(s.url)}</p>
+                  <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+                    {s.suggestions!.map((sug, i) => (
+                      <div key={i} className="px-4 py-3.5">
+                        <p className="text-sm text-slate-900">
+                          Link &ldquo;<span className="font-medium">{sug.anchor_text}</span>&rdquo; to{" "}
+                          <a
+                            href={sug.link_to_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-600 underline"
+                          >
+                            {domainOf(sug.link_to_url)}
+                            {pathOf(sug.link_to_url)}
+                          </a>
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">{sug.placement_context}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
           </div>
         </section>
       )}
