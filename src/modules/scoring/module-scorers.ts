@@ -100,24 +100,42 @@ export function scoreEntitiesSemantic(
 
 export function scoreEeat(page: ExtractedPage): ModuleScore {
   const e = page.eeat;
+  // YMYL categories (medical/financial/legal/safety) get held to a
+  // stricter bar than general content — same checklist, harsher penalty
+  // for unsubstantiated claims (spec A5/A11).
+  const isYmyl = e.content_category !== "general";
+
   const base = boolCoverage([
-    e.named_doctor,
-    e.doctor_photo,
+    e.named_author_or_expert,
+    e.author_photo,
     e.credentials.length > 0,
     e.registration_number_present,
     e.memberships.length > 0,
-    Boolean(e.hospital_affiliation),
+    Boolean(e.organization_affiliation),
     e.author_present,
     e.reviewer_present,
-    e.medically_reviewed_block,
+    e.content_reviewed_block,
     Boolean(e.last_reviewed_date),
     e.references_present,
-    e.before_after_cases,
-    e.patient_reviews,
+    e.outcome_evidence_present,
+    e.customer_reviews,
   ]);
 
-  const penalty = Math.min(e.unsubstantiated_claims.length * 5, 30);
+  const penaltyPerClaim = isYmyl ? 8 : 5;
+  const maxPenalty = isYmyl ? 40 : 30;
+  const penalty = Math.min(e.unsubstantiated_claims.length * penaltyPerClaim, maxPenalty);
   const rawScore = Math.max(0, base - penalty);
+
+  const notes = [
+    isYmyl
+      ? `YMYL content (${e.content_category}) — stricter E-E-A-T scrutiny applied.`
+      : null,
+    penalty > 0
+      ? `${e.unsubstantiated_claims.length} unsubstantiated claim(s) detected, -${penalty} pts (spec A11).`
+      : null,
+  ]
+    .filter((n): n is string => n !== null)
+    .join(" ");
 
   return {
     module: "eeat",
@@ -125,25 +143,22 @@ export function scoreEeat(page: ExtractedPage): ModuleScore {
     weight: 0,
     provisional: false,
     confidence: "medium",
-    notes:
-      penalty > 0
-        ? `${e.unsubstantiated_claims.length} unsubstantiated claim(s) detected, -${penalty} pts (spec A11).`
-        : undefined,
+    notes: notes || undefined,
   };
 }
 
 export function scoreExperience(page: ExtractedPage): ModuleScore {
   const x = page.experience;
   const rawScore = boolCoverage([
-    x.patient_reviews,
+    x.customer_reviews,
     x.verified_reviews,
-    x.before_after_photos,
+    x.outcome_evidence,
     x.case_studies,
-    x.named_treating_doctors.length > 0,
-    x.patient_videos,
+    x.named_practitioners_or_staff.length > 0,
+    x.customer_videos,
     x.real_location_photos,
-    x.recovery_guidance,
-    x.patient_stories,
+    x.aftercare_or_support_guidance,
+    x.customer_stories,
   ]);
 
   return {
@@ -161,8 +176,8 @@ export function scoreLocal(page: ExtractedPage): ModuleScore {
     l.city_in_title,
     l.city_in_h1,
     l.city_in_intro,
-    l.doctor_city_association,
-    l.clinic_city_association,
+    l.provider_city_association,
+    l.business_city_association,
     l.neighborhood_coverage.length > 0,
     l.address_present,
     l.phone_present,
@@ -170,7 +185,7 @@ export function scoreLocal(page: ExtractedPage): ModuleScore {
     l.local_reviews,
     l.local_cost_info,
     l.local_faqs,
-    l.local_business_or_hospital_schema,
+    l.local_business_schema,
     l.geo_markup,
   ]);
 

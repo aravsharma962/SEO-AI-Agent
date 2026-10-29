@@ -1,7 +1,6 @@
 import type { AuditInput, ExtractedPage } from "@/types/audit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { fetchPage, extractOnPage, extractSchema, extractSocialMetadata, extractTechnical } from "@/modules/extraction";
-import { mapContentArchitecture } from "@/modules/content-architecture";
 import { classifySearchIntent } from "@/modules/serp-intent";
 import { extractEntitiesAndRelationships } from "@/modules/entities";
 import { analyzeSentiment } from "@/modules/sentiment";
@@ -11,6 +10,8 @@ import { analyzeLocalSeo } from "@/modules/local-seo";
 import { checkSerpPosition } from "@/modules/serp-check";
 import { embedText } from "@/modules/semantic";
 import { fetchAuthorityData } from "@/lib/dataforseo/client";
+import { recommendSchema } from "@/modules/schema-recommendations";
+import { suggestInternalLinks } from "@/modules/internal-links";
 import { scoreAllPages } from "@/modules/scoring";
 import { buildComparison } from "@/modules/comparison";
 import * as cheerio from "cheerio";
@@ -60,13 +61,16 @@ export async function runAuditPipeline(
       const pageText = $("body").text().replace(/\s+/g, " ").trim();
 
       const onPage = extractOnPage(html, httpStatus);
-      const content = mapContentArchitecture(onPage.headings);
       const schemaData = extractSchema(html);
       const socialMetadata = extractSocialMetadata(html);
       const technical = extractTechnical(html, httpStatus, onPage.robots);
 
       const [entityResult, sentiment, eeat, experience, local, authority, serpCheck, embedding] = await Promise.all([
-        extractEntitiesAndRelationships({ targetKeyword: input.target_keyword, pageText }),
+        extractEntitiesAndRelationships({
+          targetKeyword: input.target_keyword,
+          pageText,
+          headings: onPage.headings,
+        }),
         analyzeSentiment(pageText),
         analyzeEeat(pageText),
         analyzeExperience(pageText),
@@ -81,13 +85,31 @@ export async function runAuditPipeline(
       // rather than discarding it outright.
       const observedRank = serpCheck.observed_rank ?? pageInput.observed_rank ?? null;
 
+      // Both need entities/content_category from the batch above, so they
+      // run as a second, smaller parallel step rather than the first.
+      const [schemaRecommendations, internalLinkSuggestions] = await Promise.all([
+        recommendSchema({
+          onPage,
+          entities: entityResult.entities,
+          contentCategory: eeat.content_category,
+          typesPresent: schemaData.types_present,
+        }),
+        pageInput.is_own_page && (input.internal_link_candidates?.length ?? 0) > 0
+          ? suggestInternalLinks({
+              pageText,
+              entities: entityResult.entities,
+              candidates: input.internal_link_candidates!,
+            })
+          : Promise.resolve(null),
+      ]);
+
       const extractedPage: ExtractedPage = {
         url: pageInput.url,
         observed_rank: observedRank,
         serp_check: serpCheck,
         embedding,
         on_page: onPage,
-        content,
+        content: entityResult.content,
         entities: entityResult.entities,
         entity_relationships: entityResult.relationships,
         schema_data: schemaData,
@@ -98,6 +120,8 @@ export async function runAuditPipeline(
         eeat,
         experience,
         local,
+        schema_recommendations: schemaRecommendations,
+        internal_link_suggestions: internalLinkSuggestions,
         scores: null,
       };
 
@@ -117,6 +141,8 @@ export async function runAuditPipeline(
         experience: extractedPage.experience,
         local: extractedPage.local,
         schema_data: extractedPage.schema_data,
+        schema_recommendations: extractedPage.schema_recommendations,
+        internal_links: extractedPage.internal_link_suggestions,
         social_metadata: extractedPage.social_metadata,
         technical: extractedPage.technical,
         authority: extractedPage.authority,
@@ -164,6 +190,7 @@ export async function runAuditPipeline(
       semantic_gaps: comparison.semantic_gaps,
       technical_gaps: comparison.technical_gaps,
       authority_gaps: comparison.authority_gaps,
+      content_briefs: comparison.content_briefs,
       ranking_hypothesis: comparison.ranking_hypothesis,
       recommendations: comparison.recommendations,
       current_scores: comparison.current_scores,

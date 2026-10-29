@@ -43,6 +43,17 @@ export function exportReportToExcel(report: AuditReportResponse) {
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recRows), "Recommendations");
 
+  const briefRows = (report.content_briefs ?? []).map((b) => ({
+    Topic: b.topic,
+    "Gap Type": b.gap_type,
+    "Target Pages": b.target_page_urls.join(", "),
+    "Sections To Add": b.sections_to_add.join(", "),
+    "Entities To Include": b.key_entities_to_include.join(", "),
+    "Suggested Depth": b.suggested_depth,
+    Brief: b.brief,
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(briefRows), "Content Briefs");
+
   const hypoRows = (report.ranking_hypothesis ?? []).map((h) => ({
     Statement: h.statement,
     Confidence: h.confidence,

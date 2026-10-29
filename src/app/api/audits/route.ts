@@ -10,6 +10,12 @@ import type { AuditInput } from "@/types/audit";
 const AuditPageInputSchema = z.object({
   url: z.string().url(),
   observed_rank: z.number().int().positive().optional(),
+  is_own_page: z.boolean().optional(),
+});
+
+const InternalLinkCandidateSchema = z.object({
+  url: z.string().url(),
+  topic: z.string().min(1),
 });
 
 const AuditInputSchema = z.object({
@@ -20,6 +26,7 @@ const AuditInputSchema = z.object({
   page_type: z.string().optional(),
   country: z.string().optional(),
   competitor_data_source: z.enum(["manual", "crawler", "api"]).optional(),
+  internal_link_candidates: z.array(InternalLinkCandidateSchema).max(20).optional(),
 });
 
 /**

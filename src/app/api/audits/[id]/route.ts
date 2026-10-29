@@ -72,6 +72,8 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     eeat: row.eeat,
     experience: row.experience,
     local: row.local,
+    schema_recommendations: row.schema_recommendations ?? [],
+    internal_link_suggestions: row.internal_links ?? null,
     scores: row.scores,
   }));
 
@@ -94,6 +96,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
       semantic_gaps: comparisonRow.semantic_gaps,
       technical_gaps: comparisonRow.technical_gaps,
       authority_gaps: comparisonRow.authority_gaps,
+      content_briefs: comparisonRow.content_briefs ?? [],
       ranking_hypothesis: comparisonRow.ranking_hypothesis,
       recommendations: comparisonRow.recommendations,
       current_scores: comparisonRow.current_scores,

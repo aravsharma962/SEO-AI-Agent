@@ -5,6 +5,10 @@ A **Comparative Ranking Diagnostic and Optimization System**: given a target key
 identifies actionable content/entity/E-E-A-T/technical gaps, and calculates a current vs.
 projected optimization score — never a rank guarantee.
 
+Works across any industry — plug in any two page URLs, medical, financial, legal, SaaS,
+e-commerce, home services, whatever — and it detects the appropriate content category itself
+(see "Multi-industry + YMYL-aware analysis" below) rather than assuming one vertical.
+
 Full product spec: see the master spec document supplied at project kickoff (Parts A–F).
 This README covers what's actually implemented (Phase 1 "Foundation" + a working thin
 vertical slice per the spec's Part D2) and how to run it.
@@ -49,8 +53,7 @@ deterministic TypeScript.
 | SERP intent | Claude | `src/modules/serp-intent` |
 | Live SERP rank verification | Claude + `web_search` tool | `src/modules/serp-check` |
 | Page crawl / extraction | Code | `src/modules/extraction` |
-| Content architecture mapping | Code | `src/modules/content-architecture` |
-| Entity extraction + relationships | Claude | `src/modules/entities` |
+| Entity extraction + relationships + content-section labeling | Claude | `src/modules/entities` |
 | Semantic proximity | Code (pgvector + Voyage embeddings) | `src/modules/semantic` |
 | Sentiment | Claude (diagnostic only) | `src/modules/sentiment` |
 | E-E-A-T | Claude (checklist-guided) | `src/modules/eeat` |
@@ -95,6 +98,51 @@ changes show up as a "Page Activity" panel on the report once any exist
 (`src/app/page-changes-panel.tsx`). Since this watches the same tracked set as rank
 tracking, it also catches unexpected changes to your *own* site, not just competitors'.
 
+### Multi-industry + YMYL-aware analysis
+
+Nothing about entity types, content sections, or the E-E-A-T/experience/local checklists is
+hard-coded to one vertical:
+
+- **Content sections** (`src/modules/entities`) are labeled by Claude per audit, not matched
+  against a fixed keyword list — a medical audit and a SaaS pricing-page audit get entirely
+  different section vocabularies (e.g. `dosage` vs. `pricing_tiers`), and gap classification
+  only ever compares the *distribution* of labels across pages, never their specific values, so
+  it works unchanged regardless of industry.
+- **Entities** use a generalized type set (`core_subject`, `person_or_expert`, `cost_or_pricing`,
+  etc. — see `EntityType` in `src/types/audit.ts`) that fits a condition/procedure just as well
+  as a financial product or a legal matter.
+- **E-E-A-T** (`src/modules/eeat`) first classifies each page's `content_category` — one of
+  `ymyl_medical`, `ymyl_financial`, `ymyl_legal`, `ymyl_safety`, or `general` — in the same
+  Claude call that scores the checklist, then `scoreEeat` (`src/modules/scoring/module-scorers.ts`)
+  applies a harsher penalty for unsubstantiated claims on YMYL categories than on general content,
+  matching Google's own stricter bar for "Your Money or Your Life" pages without forcing
+  medical-specific checks (license numbers, "medically reviewed by") onto pages that aren't YMYL.
+- **Experience / Local SEO** (`src/modules/experience`, `src/modules/local-seo`) use
+  industry-neutral field names (`customer_reviews`, `outcome_evidence`,
+  `named_practitioners_or_staff`, `provider_city_association`, etc.) that read naturally whether
+  the page is a clinic, a law firm, or an online store.
+
+### Content briefs, schema recommendations, internal-link suggestions
+
+Three Part F items that don't need any external integration, so they're built now:
+
+- **Content briefs** (`src/modules/content-brief`) — one Claude call per audit turns the
+  highest-priority content gaps (`core_gap`/`differentiator_gap`) into structural writing
+  briefs: which sections to add, which entities to cover (drawn only from what's actually
+  evidenced on the pages that already cover the topic), and a suggested depth. These are
+  briefs for a writer, never drafted copy — the module never fabricates facts or claims.
+- **Schema recommendations** (`src/modules/schema-recommendations`) — per page, Claude judges
+  which schema.org types would be genuinely relevant additions *for that specific page*
+  (never a generic checklist — no Recipe schema on a law firm page) and generates
+  ready-to-paste JSON-LD using only values already evidenced in the extracted page data;
+  anything schema.org expects but the data doesn't support is omitted rather than invented.
+- **Internal-link suggestions** (`src/modules/internal-links`) — optional: pass
+  `internal_link_candidates` (other pages on your own site + a short topic description) and
+  mark your page `is_own_page: true` in the audit request, and Claude suggests specific,
+  natural internal links (anchor text + placement) from your page to those candidates. Skipped
+  entirely (not guessed) when no candidates are supplied — same missing-data pattern as
+  authority/semantic proximity.
+
 ### Guardrails (spec A4/A10/A11)
 
 Enforced primarily via the system prompts in `src/modules/comparison/ranking-hypothesis.ts`,
@@ -132,8 +180,8 @@ it never trusts a client_id from the request body.
 
 1. **Supabase**
    - Create a project, enable the `vector` extension (the migration does this too).
-   - Run `supabase/migrations/0001_init.sql` then `0002_auth_provisioning.sql` against it,
-     in that order (Supabase SQL editor, or the Supabase CLI: `supabase db push`).
+   - Run every file in `supabase/migrations/` against it in filename order (Supabase SQL
+     editor, or the Supabase CLI: `supabase db push`).
    - In Authentication → Providers → Email, "Confirm email" is on by default — either
      leave it on (users confirm via the email Supabase sends before their first sign-in)
      or turn it off for faster local testing.
@@ -162,7 +210,11 @@ directly from the browser after sign-in).
 
 ```
 POST /api/audits
-{ "target_keyword": "...", "pages": [{ "url": "..." }, { "url": "..." }] }
+{
+  "target_keyword": "...",
+  "pages": [{ "url": "...", "is_own_page": true }, { "url": "..." }],
+  "internal_link_candidates": [{ "url": "...", "topic": "..." }]  // optional
+}
 -> 202 { "status": "pending", "audit_run_id": "<uuid>" }
 
 GET /api/audits/{audit_run_id}

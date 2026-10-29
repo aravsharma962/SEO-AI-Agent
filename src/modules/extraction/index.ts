@@ -81,20 +81,19 @@ export function extractOnPage(html: string, httpStatus: number): OnPageData {
     published_date: publishedDate,
     modified_date: modifiedDate,
     author,
-    reviewer: null, // populated by E-E-A-T module (medically-reviewed block detection)
+    reviewer: null, // populated by E-E-A-T module ("content reviewed by" block detection)
     last_reviewed_date: null,
   };
 }
 
 const KNOWN_SCHEMA_TYPES = [
   "WebPage",
-  "MedicalWebPage",
   "Article",
-  "MedicalOrganization",
   "Organization",
-  "Hospital",
-  "Physician",
   "LocalBusiness",
+  "Product",
+  "Service",
+  "HowTo",
   "FAQPage",
   "BreadcrumbList",
   "VideoObject",
@@ -102,7 +101,15 @@ const KNOWN_SCHEMA_TYPES = [
   "Review",
   "AggregateRating",
   "Person",
-  "Service",
+  // Industry-specific types recognized alongside the generic ones above —
+  // this list feeds a coverage ratio (schema present / KNOWN_SCHEMA_TYPE_COUNT),
+  // it never gates or requires any specific type.
+  "MedicalWebPage",
+  "MedicalOrganization",
+  "Hospital",
+  "Physician",
+  "LegalService",
+  "FinancialService",
 ];
 
 /**

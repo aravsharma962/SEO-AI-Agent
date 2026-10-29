@@ -9,12 +9,20 @@ export type SearchIntent =
   | "commercial"
   | "transactional"
   | "local"
-  | "medical"
-  | "procedure"
   | "cost"
-  | "doctor"
   | "comparison"
   | "navigational";
+
+// Google's YMYL ("Your Money or Your Life") content categories — pages in
+// these categories get held to a stricter E-E-A-T bar (spec A5/A11). Any
+// page that doesn't fall into one of these is "general" and gets the
+// baseline trust/expertise checklist instead of a category-specific one.
+export type ContentCategory =
+  | "ymyl_medical"
+  | "ymyl_financial"
+  | "ymyl_legal"
+  | "ymyl_safety"
+  | "general";
 
 // ---------------------------------------------------------------------------
 // A6 — Required inputs
@@ -23,6 +31,15 @@ export type SearchIntent =
 export interface AuditPageInput {
   url: string;
   observed_rank?: number;
+  is_own_page?: boolean; // marks the page internal-link suggestions are generated for
+}
+
+// A same-site page the caller offers as a candidate internal-link target,
+// e.g. { url: "https://example.com/pricing", topic: "pricing and plans" }.
+// Only meaningful alongside an is_own_page: true entry in `pages`.
+export interface InternalLinkCandidate {
+  url: string;
+  topic: string;
 }
 
 export interface AuditInput {
@@ -33,6 +50,7 @@ export interface AuditInput {
   page_type?: string;
   country?: string;
   competitor_data_source?: "manual" | "crawler" | "api";
+  internal_link_candidates?: InternalLinkCandidate[];
 }
 
 export interface SerpIntentResult {
@@ -62,57 +80,37 @@ export interface OnPageData {
   last_reviewed_date: string | null;
 }
 
-export type ContentSection =
-  | "intro"
-  | "condition_overview"
-  | "types_or_grades"
-  | "diagnosis"
-  | "candidacy"
-  | "treatment_options"
-  | "technique"
-  | "procedure"
-  | "prep"
-  | "anaesthesia"
-  | "duration"
-  | "hospital_stay"
-  | "recovery"
-  | "follow_up"
-  | "risks"
-  | "complications"
-  | "results"
-  | "recurrence"
-  | "scars"
-  | "cost"
-  | "insurance"
-  | "doctor"
-  | "clinic_or_hospital"
-  | "before_after"
-  | "reviews"
-  | "faqs"
-  | "references"
-  | "cta";
+// Canonical section labels are now assigned by Claude per-page (see
+// src/modules/entities), not matched against a fixed keyword list — a
+// medical audit and a SaaS pricing-page audit need entirely different
+// section vocabularies, and the labels themselves are just distribution
+// data to scoring/gap-classification (they never branch on specific
+// values), so a free-form string is the correct type here.
+export type ContentSection = string;
 
 export interface ContentArchitecture {
   sections_present: ContentSection[];
-  sections_by_heading: { heading: string; section: ContentSection | "unclassified" }[];
+  sections_by_heading: { heading: string; section: ContentSection }[];
 }
 
+// Generalized across industries — see the extraction prompt in
+// src/modules/entities for how each label is applied (e.g. "core_subject"
+// is the condition/procedure on a medical page, the product/service on a
+// SaaS or e-commerce page, the claim type on a legal/insurance page).
 export type EntityType =
-  | "condition_or_procedure"
-  | "anatomy"
-  | "tissue"
-  | "technique"
-  | "equipment"
-  | "diagnostic_test"
-  | "medication"
-  | "risk"
-  | "recovery_concept"
-  | "doctor"
-  | "hospital_or_clinic"
+  | "core_subject"
+  | "component_or_aspect"
+  | "method_or_technique"
+  | "tool_or_resource"
+  | "evaluation_or_test"
+  | "risk_or_limitation"
+  | "outcome_or_benefit"
+  | "person_or_expert"
+  | "organization"
   | "location"
-  | "cost"
-  | "insurance"
-  | "patient_evidence";
+  | "cost_or_pricing"
+  | "coverage_or_regulatory"
+  | "user_evidence";
 
 export interface Entity {
   name: string;
@@ -131,9 +129,25 @@ export interface EntityRelationship {
 }
 
 export interface SchemaData {
-  types_present: string[]; // e.g. MedicalWebPage, FAQPage, Physician
+  types_present: string[]; // e.g. Article, FAQPage, Product, MedicalWebPage, LocalBusiness
   properties: Record<string, unknown>;
   missing_recommended: string[];
+}
+
+// Ready-to-paste JSON-LD for a schema type judged genuinely relevant to this
+// specific page and missing from it (src/modules/schema-recommendations) —
+// distinct from the raw missing_recommended coverage list above, which is
+// just "not present" with no relevance judgment or generated markup.
+export interface SchemaRecommendation {
+  schema_type: string;
+  json_ld: Record<string, unknown>;
+  rationale: string;
+}
+
+export interface InternalLinkSuggestion {
+  anchor_text: string;
+  link_to_url: string;
+  placement_context: string;
 }
 
 export interface SocialMetadata {
@@ -183,42 +197,43 @@ export interface SentimentData {
 }
 
 export interface EeatData {
-  named_doctor: boolean;
-  doctor_photo: boolean;
-  credentials: string[]; // e.g. MBBS, MS, MCh, DNB
+  content_category: ContentCategory; // self-reported by the module (spec A5/A11)
+  named_author_or_expert: boolean;
+  author_photo: boolean;
+  credentials: string[]; // e.g. MBBS/MS (medical), CFA/CPA (financial), JD/Esq (legal), or role titles
   specialty: string | null;
   years_experience: number | null;
-  registration_number_present: boolean;
+  registration_number_present: boolean; // license/registration/certification number
   memberships: string[];
-  hospital_affiliation: string | null;
+  organization_affiliation: string | null;
   author_present: boolean;
   reviewer_present: boolean;
-  medically_reviewed_block: boolean;
+  content_reviewed_block: boolean; // "medically reviewed by" / "legally reviewed by" / "fact-checked by" etc.
   last_reviewed_date: string | null;
   references_present: boolean;
-  before_after_cases: boolean;
-  patient_reviews: boolean;
+  outcome_evidence_present: boolean; // before/after cases, case studies, verifiable results
+  customer_reviews: boolean;
   unsubstantiated_claims: string[]; // flagged per A11
 }
 
 export interface ExperienceData {
-  patient_reviews: boolean;
+  customer_reviews: boolean;
   verified_reviews: boolean;
-  before_after_photos: boolean;
+  outcome_evidence: boolean; // before/after photos, demos, portfolio, screenshots of results
   case_studies: boolean;
-  named_treating_doctors: string[];
-  patient_videos: boolean;
+  named_practitioners_or_staff: string[];
+  customer_videos: boolean;
   real_location_photos: boolean;
-  recovery_guidance: boolean;
-  patient_stories: boolean;
+  aftercare_or_support_guidance: boolean; // post-purchase/post-treatment/post-service guidance
+  customer_stories: boolean;
 }
 
 export interface LocalSeoData {
   city_in_title: boolean;
   city_in_h1: boolean;
   city_in_intro: boolean;
-  doctor_city_association: boolean;
-  clinic_city_association: boolean;
+  provider_city_association: boolean; // named person + city, e.g. "Dr. X in Koramangala" or "Attorney Y in Austin"
+  business_city_association: boolean;
   neighborhood_coverage: string[];
   address_present: boolean;
   phone_present: boolean;
@@ -226,7 +241,7 @@ export interface LocalSeoData {
   local_reviews: boolean;
   local_cost_info: boolean;
   local_faqs: boolean;
-  local_business_or_hospital_schema: boolean;
+  local_business_schema: boolean;
   geo_markup: boolean;
 }
 
@@ -288,6 +303,19 @@ export interface Recommendation {
   rationale: string;
 }
 
+// A structural writing brief for a core_gap/differentiator_gap worth
+// actually writing content for — what to add and roughly how, never drafted
+// copy or invented facts (src/modules/content-brief).
+export interface ContentBrief {
+  topic: string; // matches a ContentGap.topic
+  gap_type: GapType;
+  target_page_urls: string[]; // pages missing this topic the brief is for
+  sections_to_add: string[];
+  key_entities_to_include: string[];
+  suggested_depth: MentionDepth;
+  brief: string;
+}
+
 // ---------------------------------------------------------------------------
 // Fully assembled per-page + comparison records (persisted in Supabase)
 // ---------------------------------------------------------------------------
@@ -315,6 +343,10 @@ export interface ExtractedPage {
   eeat: EeatData;
   experience: ExperienceData;
   local: LocalSeoData;
+  schema_recommendations: SchemaRecommendation[];
+  // null = not requested (no internal_link_candidates supplied for this
+  // page); [] = requested but nothing genuinely relevant was found.
+  internal_link_suggestions: InternalLinkSuggestion[] | null;
   scores: PageScoreSummary | null;
 }
 
@@ -324,6 +356,7 @@ export interface AuditComparison {
   semantic_gaps: ContentGap[];
   technical_gaps: ContentGap[];
   authority_gaps: ContentGap[];
+  content_briefs: ContentBrief[];
   ranking_hypothesis: RankingHypothesisItem[];
   recommendations: Recommendation[];
   current_scores: Record<string, number>;
@@ -365,6 +398,8 @@ export interface AuditReportResponse {
     schema_analysis: { url: string; schema: SchemaData }[];
     technical_analysis: { url: string; technical: TechnicalData }[];
     authority_analysis: { url: string; authority: AuthorityData }[];
+    schema_recommendations: { url: string; recommendations: SchemaRecommendation[] }[];
+    internal_link_suggestions: { url: string; suggestions: InternalLinkSuggestion[] | null }[];
   };
   scores?: Record<
     string,
@@ -378,6 +413,7 @@ export interface AuditReportResponse {
   >;
   ranking_hypothesis?: RankingHypothesisItem[];
   recommendations?: Recommendation[];
+  content_briefs?: ContentBrief[];
   missing_data?: string[];
   confidence?: Confidence | "medium-high";
 }

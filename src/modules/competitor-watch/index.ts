@@ -17,8 +17,8 @@ const SYSTEM_PROMPT = `You compare two snapshots of the same webpage (older vs n
 difference is SEO-meaningful — not just any byte-level change. Most real-world page diffs are noise:
 ad copy, timestamps, unrelated widget content, minor rewording that changes nothing substantive.
 Only flag changes that could plausibly affect search ranking or a competitive SEO analysis: new or
-removed content sections, changed claims/credentials, new schema-relevant details (doctor info,
-pricing, reviews), changed calls to action, restructured headings, or added/removed topics.
+removed content sections, changed claims/credentials, new schema-relevant details (author/expert
+info, pricing, reviews), changed calls to action, restructured headings, or added/removed topics.
 
 Respond with ONLY a JSON object:
 {"changed": bool, "seo_relevant": bool, "summary": "<1-2 sentences, empty string if changed is false>",
